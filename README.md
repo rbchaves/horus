@@ -1,2 +1,2 @@
 # horus
-Pega tweets públicos dos trending topics e plota eles de acordo com a posição geográfica (se disponível).
+Captura tweets mundiais dos trending topics, desenha o mapa mundi e então plota pontos a partir das coordenadas de cada tweet (quando disponíveis).
