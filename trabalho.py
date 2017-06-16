@@ -3,8 +3,8 @@
 
 """ Captura tweets mundiais dos trending topics, desenha o mapa mundi e então plota pontos a partir das coordenadas de cada tweet (quando disponíveis) """
 
-#import time
-#from threading import Timer
+import datetime
+from threading import Timer
 
 # Mapa
 from mpl_toolkits.basemap import Basemap
@@ -15,6 +15,10 @@ from tkMessageBox import showerror
 import sys
 # Twitter
 import tweepy
+
+
+CONFIG_MAP_PATH_TO_FILE = "map.ini"
+CONFIG_TWITTER_PATH_TO_FILE = "twitter.ini"
 
 class Config:
 	""" Desserializa um arquivo de configuração genérico do tipo "NOME_CONFIG=VALOR_CONFIG;NOME_CONFIG=VALOR_CONFIG" """
@@ -50,7 +54,7 @@ class Map:
 		self.map.drawcoastlines()
 		self.map.drawmapboundary(fill_color=self.__config.get_config("OCEAN_COLOR"))
 		self.map.fillcontinents(color=self.__config.get_config("CONTINENT_COLOR"), lake_color=self.__config.get_config("LAKE_COLOR"))
-		plt.show()
+		plt.ion()
 
 	def plot_point(self, lat, lon, radius):
 		x, y = self.map(lon, lat)
@@ -63,13 +67,48 @@ class AuthHandler:
 		self.connected = False
 		self.__config = Config(config_file)
 		self.__auth = tweepy.OAuthHandler(self.__config.get_config("CONSUMER_KEY"), self.__config.get_config("CONSUMER_SECRET"))
+		self.__auth.set_access_token(self.__config.get_config("ACCESS_TOKEN"), self.__config.get_config("ACCESS_TOKEN_SECRET"))
 		self.api = tweepy.API(self.__auth)
 		self.connected = True
 
-# Apenas essa linha é executada enquanto o mapa está aberto
-MY_MAP = Map()
+class TrendsStreamListener(tweepy.StreamListener):
+	def __init__(self, auth_handler):
+		self.api = auth_handler.api
+		self.trends_round = 0
+		self.map = Map(CONFIG_MAP_PATH_TO_FILE)
+		self.stream = tweepy.Stream(auth=self.api.auth, listener=self)
+		self.get_new_trends()
+	
+	def get_new_trends(self):
+		self.trends_round += 1
+		trends_json = self.api.trends_place(id=1)
+		trends_data = trends_json[0]
+		trends = trends_data['trends']
+		trends_name = [trend['name'] for trend in trends]
+		print trends_name
+		self.stream.filter(track=trends_name)
 
-# Linhas abaixos são executadas somente depois de se fechar o mapa
+	def __set_timer(self):
+		self.__timer = Timer(300, self.get_new_trends)
+		self.__timer.start()
+
+	def on_status(self, tweet):
+		if (tweet.coordinates != None):
+			print tweet.text, "\t", tweet.coordinates
+			self.map.plot_point(tweet.coordinates['coordinates'][1], tweet.coordinates['coordinates'][0], 5)
+			plt.pause(0.1)
+
+	def on_error(self, status):
+		print "[" + str(datetime.datetime.now()) + "] " + str(status)
+
+# Apenas essa linha é executada enquanto o mapa está aberto
+"""MY_MAP = Map()"""
+
+"""# Linhas abaixos são executadas somente depois de se fechar o mapa
 MY_AUTH_HANDLER = AuthHandler()
-MY_APP.plot_point(-33.924869, 18.424055, 5)
-print MY_AUTH_HANDLER.connected
+MY_MAP.plot_point(-33.924869, 18.424055, 5)
+print MY_AUTH_HANDLER.connected"""
+
+
+MY_AUTH_HANDLER = AuthHandler()
+TRENDS_STREAM_LISTENER = TrendsStreamListener(MY_AUTH_HANDLER)
