@@ -3,6 +3,7 @@
 
 """ Captura tweets mundiais dos trending topics, desenha o mapa mundi e então plota pontos a partir das coordenadas de cada tweet (quando disponíveis) """
 
+
 # Mapa
 from mpl_toolkits.basemap import Basemap
 import matplotlib
@@ -24,7 +25,7 @@ from random import randint
 
 CONFIG_MAP_PATH_TO_FILE = "map.ini"
 CONFIG_TWITTER_PATH_TO_FILE = "twitter.ini"
-MAX_RADIUS = 20
+MAX_RADIUS = 15
 
 class Config:
 	""" Desserializa um arquivo de configuração genérico do tipo "NOME_CONFIG=VALOR_CONFIG;NOME_CONFIG=VALOR_CONFIG" """
@@ -54,7 +55,7 @@ class Config:
 
 class Map:
 	# Gerencia o desenho do mapa e pontos na tela
-	def __init__(self, config_file="map.ini"):
+	def __init__(self, master, config_file="map.ini"):
 		self.__config = Config(config_file)
 		self.map = Basemap(projection=self.__config.get_config("PROJECTION"), resolution=self.__config.get_config("RESOLUTION"), lon_0=0)	
 		self.map.drawcoastlines()
@@ -63,9 +64,8 @@ class Map:
 
 	def plot_point(self, lat, lon, radius):
 		# Desenha o ponto no mapa
-        x, y = self.map(lon, lat)
-		self.map.plot(x, y, 'ro', markersize=radius)
-		plt.draw()
+	       	x, y = self.map(lon, lat)
+		self.map.plot(x, y, 'bo', markersize=radius, alpha=0.6)
 
 class AuthHandler:
 	""" Responsável pelo processo de autenticação do Twitter """
@@ -83,27 +83,31 @@ class TrendsStreamListener(tweepy.StreamListener):
 		self.get_new_trends()
 	
 	def get_new_trends(self):
-        # Pega os Trending Topics mundiais (Yahoo Where On Earth ID (WOEID) = 1)
+        	# Pega os Trending Topics mundiais (Yahoo Where On Earth ID (WOEID) = 1)
 		trends_json = self.api.trends_place(id=1)
 		trends_data = trends_json[0]
 		trends = trends_data['trends']
-        # Pega os nomes crus dos Trending Topics
+        	# Pega os nomes crus dos Trending Topics
 		trends_name = [trend['name'] for trend in trends]
-        # Começa a escutar por essas palavras
+        	# Começa a escutar por essas palavras
 		self.stream.filter(track=trends_name, async=True)
 
 	def on_status(self, tweet):
 		if (tweet.coordinates != None):
-			print ("[" + str(datetime.datetime.now()) + "] Novo tweet localizado. Coordenadas: " + tweet.coordinates)
-			# Desenha o ponto no mapa
+			print ("[" + str(datetime.datetime.now()) + "] Novo tweet localizado. Coordenadas: " + str(tweet.coordinates['coordinates']))
+			# Manda desenhar o ponto do tweet no mapa
 			self.map.plot_point(tweet.coordinates['coordinates'][1], tweet.coordinates['coordinates'][0], randint(5, MAX_RADIUS))
 			
 	def on_error(self, status):
+		# Se houver algum erro da API do twitter, saberemos aqui
 		print ("[" + str(datetime.datetime.now()) + "] " + str(status))
+
 
 MY_AUTH_HANDLER = AuthHandler()
 TRENDS_STREAM_LISTENER = TrendsStreamListener(MY_AUTH_HANDLER)
 
-# Redesenha o mapa e libera o Tk
-while (True):
+# Tweepy está rodando em um thread (e portanto chamará Map.plot_point() por si só), podemos então redesenhar o mapa inteiro a cada 0.05s, e esse será o único comando de desenho do nosso programa. 
+while(True):
 	plt.pause(0.05)
+
+# Nada roda aqui
