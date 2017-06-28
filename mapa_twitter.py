@@ -64,7 +64,7 @@ class Map:
 
 	def plot_point(self, lat, lon, radius):
 		# Desenha o ponto no mapa
-	       	x, y = self.map(lon, lat)
+		x, y = self.map(lon, lat)
 		self.map.plot(x, y, 'bo', markersize=radius, alpha=0.6)
 
 class AuthHandler:
@@ -111,3 +111,4 @@ while(True):
 	plt.pause(0.05)
 
 # Nada roda aqui
+# print "hello"
